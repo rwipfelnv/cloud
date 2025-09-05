@@ -3,6 +3,7 @@ package v1
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -99,9 +100,20 @@ func (c *AWSClient) CreateInstance(ctx context.Context, attrs v1.CreateInstanceA
 		})
 	}
 
+	// 7.5. Get AMI ID if not provided
+	imageID := attrs.ImageID
+	if imageID == "" {
+		// Use default Ubuntu 22.04 LTS AMI for the region, matching instance architecture
+		defaultAMI, err := c.getDefaultAMI(ctx, attrs.InstanceType)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get default AMI: %w", err)
+		}
+		imageID = defaultAMI
+	}
+
 	// 8. Prepare instance request
 	runInput := &ec2.RunInstancesInput{
-		ImageId:             aws.String(attrs.ImageID),
+		ImageId:             aws.String(imageID),
 		InstanceType:        types.InstanceType(attrs.InstanceType),
 		MinCount:            aws.Int32(1),
 		MaxCount:            aws.Int32(1),
@@ -399,9 +411,24 @@ func (c *AWSClient) ensureSecurityGroup(ctx context.Context, rules v1.FirewallRu
 	sgID := aws.ToString(createResult.GroupId)
 
 	// Add ingress rules
-	if len(rules.IngressRules) > 0 {
+	ingressRules := rules.IngressRules
+	
+	// If no ingress rules are provided, add a default SSH rule (port 22 from anywhere)
+	// This ensures instances are accessible for validation and management
+	if len(ingressRules) == 0 {
+		ingressRules = []v1.FirewallRule{
+			{
+				ID:       "default-ssh",
+				FromPort: 22,
+				ToPort:   22,
+				IPRanges: []string{"0.0.0.0/0"},
+			},
+		}
+	}
+
+	if len(ingressRules) > 0 {
 		var permissions []types.IpPermission
-		for _, rule := range rules.IngressRules {
+		for _, rule := range ingressRules {
 			perm := types.IpPermission{
 				IpProtocol: aws.String("tcp"),
 				FromPort:   aws.Int32(rule.FromPort),
@@ -560,6 +587,81 @@ func determineSSHUser(imageID string) string {
 	}
 	// Default to ubuntu for most cases
 	return "ubuntu"
+}
+
+// getDefaultAMI returns a default Ubuntu 22.04 LTS AMI for the current region matching instance architecture
+func (c *AWSClient) getDefaultAMI(ctx context.Context, instanceType string) (string, error) {
+	// First, determine the architecture of the instance type
+	instanceTypeInput := &ec2.DescribeInstanceTypesInput{
+		InstanceTypes: []types.InstanceType{types.InstanceType(instanceType)},
+	}
+	
+	instanceTypeResult, err := c.ec2Client.DescribeInstanceTypes(ctx, instanceTypeInput)
+	if err != nil {
+		return "", fmt.Errorf("failed to describe instance type %s: %w", instanceType, err)
+	}
+	
+	if len(instanceTypeResult.InstanceTypes) == 0 {
+		return "", fmt.Errorf("instance type %s not found", instanceType)
+	}
+	
+	// Determine architecture and AMI name pattern
+	var arch string
+	var namePattern string
+	
+	supportedArchs := instanceTypeResult.InstanceTypes[0].ProcessorInfo.SupportedArchitectures
+	if len(supportedArchs) == 0 {
+		return "", fmt.Errorf("no supported architectures found for instance type %s", instanceType)
+	}
+	
+	// Use the first supported architecture
+	firstArch := supportedArchs[0]
+	switch firstArch {
+	case types.ArchitectureTypeArm64:
+		arch = "arm64"
+		namePattern = "ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-arm64-server-*"
+	case types.ArchitectureTypeX8664:
+		arch = "x86_64"
+		namePattern = "ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"
+	default:
+		return "", fmt.Errorf("unsupported architecture %s for instance type %s", firstArch, instanceType)
+	}
+
+	// Search for the latest Ubuntu 22.04 LTS AMI with matching architecture
+	input := &ec2.DescribeImagesInput{
+		Owners: []string{"099720109477"}, // Canonical's AWS account ID for Ubuntu
+		Filters: []types.Filter{
+			{
+				Name:   aws.String("name"),
+				Values: []string{namePattern},
+			},
+			{
+				Name:   aws.String("state"),
+				Values: []string{"available"},
+			},
+			{
+				Name:   aws.String("architecture"),
+				Values: []string{arch},
+			},
+		},
+	}
+
+	result, err := c.ec2Client.DescribeImages(ctx, input)
+	if err != nil {
+		return "", fmt.Errorf("failed to describe images: %w", err)
+	}
+
+	if len(result.Images) == 0 {
+		return "", fmt.Errorf("no Ubuntu 22.04 LTS AMI found for %s architecture in region %s", arch, c.region)
+	}
+
+	// Sort by creation date to get the latest AMI
+	images := result.Images
+	sort.Slice(images, func(i, j int) bool {
+		return aws.ToString(images[i].CreationDate) > aws.ToString(images[j].CreationDate)
+	})
+
+	return aws.ToString(images[0].ImageId), nil
 }
 
 func (c *AWSClient) convertEC2Error(err error) error {

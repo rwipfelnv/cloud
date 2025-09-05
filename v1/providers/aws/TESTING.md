@@ -4,11 +4,11 @@ This guide provides comprehensive instructions for testing the AWS provider impl
 
 ## Quick Start
 
-The AWS provider is already working with your current setup! Basic integration tests are passing.
+Run basic tests to verify the AWS provider implementation.
 
 ## Testing Levels
 
-### 1. Unit Tests (Already Working ✅)
+### 1. Unit Tests
 ```bash
 # Run basic unit tests
 go test ./v1/providers/aws/
@@ -17,12 +17,12 @@ go test ./v1/providers/aws/
 go test -v ./v1/providers/aws/
 ```
 
-### 2. Integration Tests (Already Working ✅)
+### 2. Integration Tests
 ```bash
 # Run focused integration tests
 go test -v ./v1/providers/aws/ -run TestAWSIntegration
 
-# Results: ✅ 11 capabilities, 17 regions, instance types working
+# Tests capabilities, regions, and instance types
 ```
 
 ## Advanced Testing Options
@@ -38,8 +38,8 @@ ssh-keygen -t rsa -b 2048 -f ~/.ssh/aws-test-key -N ""
 
 # Set environment variables
 export AWS_DEFAULT_REGION="us-west-2"
-export AWS_VPC_ID="vpc-03adc5056a46d41f6"        # Your default VPC
-export AWS_SUBNET_ID="subnet-04563da08eef28ceb"    # Your subnet from earlier
+export AWS_VPC_ID="vpc-xxxxxxxxx"        # Your default VPC ID
+export AWS_SUBNET_ID="subnet-xxxxxxxxx"    # Your subnet ID
 export AWS_TEST_SSH_PUBLIC_KEY="$(cat ~/.ssh/aws-test-key.pub)"
 export AWS_TEST_SSH_PRIVATE_KEY="$(cat ~/.ssh/aws-test-key)"
 ```
@@ -166,10 +166,10 @@ VALIDATION_TEST=true AWS_TEST_INSTANCE_TYPE="t3.micro" go test -v ./v1/providers
 
 ## Environment Setup Options
 
-### Option 1: Use Current Setup (Recommended)
-Your current setup with `~/.aws/credentials` is working perfectly:
+### Option 1: AWS Credentials File (Recommended)
+Use AWS credentials file (`~/.aws/credentials`):
 ```bash
-# No additional setup needed
+# No additional setup needed if credentials file exists
 go test -v ./v1/providers/aws/ -run TestAWSIntegration
 ```
 
@@ -221,13 +221,13 @@ export AWS_SESSION_TOKEN="temp-token-from-sts"
 AWS_SDK_LOAD_CONFIG=1 go test -v ./v1/providers/aws/ -run TestAWSIntegration
 ```
 
-## What to Test After Lunch
+## Testing Priority
 
 ### High Priority (Safe & Fast)
-1. ✅ **Integration tests** - Already working
-2. 🔄 **AMI discovery test** - Verify Ubuntu image detection  
-3. 🔄 **GPU instance types** - Test P3/G4 instance metadata
-4. 🔄 **Multi-region testing** - Test different AWS regions
+1. **Integration tests** - Basic functionality verification
+2. **AMI discovery test** - Verify Ubuntu image detection  
+3. **GPU instance types** - Test P3/G4 instance metadata
+4. **Multi-region testing** - Test different AWS regions
 
 ### Medium Priority (Small Cost)
 5. **Instance lifecycle** - Create/terminate t3.micro (~$0.01)
@@ -239,16 +239,16 @@ AWS_SDK_LOAD_CONFIG=1 go test -v ./v1/providers/aws/ -run TestAWSIntegration
 9. **Load testing** - Performance benchmarks
 10. **Multi-VPC testing** - Advanced networking
 
-## Quick Commands for After Lunch
+## Quick Test Commands
 
 ```bash
-# 1. Verify everything still works
+# 1. Basic functionality verification
 go test -v ./v1/providers/aws/ -run TestAWSIntegration
 
 # 2. Test AMI discovery (fast, free)
 go test -v ./v1/providers/aws/ -run TestAWSIntegration/GetInstanceTypes  
 
-# 3. If feeling adventurous, test instance creation (costs ~$0.01)
+# 3. Instance creation test (costs ~$0.01)
 # ssh-keygen -t rsa -b 2048 -f ~/.ssh/aws-test-key -N ""
 # export AWS_TEST_SSH_PUBLIC_KEY="$(cat ~/.ssh/aws-test-key.pub)"
 # VALIDATION_TEST=true go test -v ./v1/providers/aws/ -run TestInstanceLifecycleValidation -timeout=10m
@@ -256,13 +256,13 @@ go test -v ./v1/providers/aws/ -run TestAWSIntegration/GetInstanceTypes
 
 ## Success Metrics
 
-Your AWS provider implementation is already successful! 🎉
+A successful AWS provider implementation should demonstrate:
 
-- ✅ **11/11 capabilities** working
-- ✅ **17/17 regions** discovered  
+- ✅ **All capabilities** working (11 total)
+- ✅ **All regions** discovered (17 total)  
 - ✅ **Instance types** loading correctly
 - ✅ **Real AWS API** integration working
-- ✅ **Credential chain** handling fixed
-- ✅ **Error mapping** functional
-
-Enjoy lunch! The AWS provider is in excellent shape. 🍽️
+- ✅ **Credential chain** handling functional
+- ✅ **Error mapping** working
+- ✅ **SSH connectivity** to instances
+- ✅ **Instance lifecycle** management
