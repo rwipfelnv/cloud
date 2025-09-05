@@ -171,8 +171,8 @@ func NewAWSClient(refID string, credential *AWSCredential, region string, opts .
 			config.WithRegion(region),
 			config.WithSharedConfigProfile(*credential.Profile),
 		)
-	} else {
-		// Use explicit credentials
+	} else if credential.AccessKeyID != "" && credential.SecretAccessKey != "" {
+		// Use explicit credentials only if both are provided
 		creds := credentials.NewStaticCredentialsProvider(
 			credential.AccessKeyID,
 			credential.SecretAccessKey,
@@ -182,6 +182,11 @@ func NewAWSClient(refID string, credential *AWSCredential, region string, opts .
 		cfg, err = config.LoadDefaultConfig(context.TODO(),
 			config.WithRegion(region),
 			config.WithCredentialsProvider(creds),
+		)
+	} else {
+		// Use default credential chain (environment variables, ~/.aws/credentials, IAM roles, etc.)
+		cfg, err = config.LoadDefaultConfig(context.TODO(),
+			config.WithRegion(region),
 		)
 	}
 
