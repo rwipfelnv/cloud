@@ -49,12 +49,13 @@ export AWS_TEST_SSH_PRIVATE_KEY="$(cat ~/.ssh/aws-test-key)"
 # Test complete instance creation/termination cycle
 VALIDATION_TEST=true go test -v ./v1/providers/aws/ -run TestInstanceLifecycleValidation -timeout=10m
 
-# What this tests:
-# - Creates t3.micro instance with Ubuntu 22.04
-# - Verifies instance reaches running state  
-# - Tests SSH connectivity
-# - Terminates instance
-# - Cleans up resources
+# What this tests (calls these validation functions):
+# - ValidateCreateInstance - Creates instance with Ubuntu 22.04
+# - ValidateListCreatedInstance - Verifies instance appears in listings
+# - ValidateSSHAccessible - Tests SSH connectivity with security groups
+# - ValidateInstanceImage - Validates instance runs expected image
+# - ValidateStopStartInstance - Tests stop/start lifecycle (if supported)
+# - ValidateTerminateInstance - Terminates instance and cleans up resources
 ```
 
 ### 4. Full Validation Suite (Most Comprehensive)
@@ -63,13 +64,11 @@ VALIDATION_TEST=true go test -v ./v1/providers/aws/ -run TestInstanceLifecycleVa
 # Run the complete validation suite
 VALIDATION_TEST=true go test -v ./v1/providers/aws/ -run TestValidationFunctions -timeout=15m
 
-# This tests:
-# - All capabilities
-# - Location discovery 
-# - Instance type validation
-# - Regional functionality
-# - Error handling
-# - Performance benchmarks
+# What this tests (calls these validation functions):
+# - ValidateGetLocations - Tests location retrieval and availability
+# - ValidateGetInstanceTypes - Tests instance type retrieval and filtering
+# - ValidateLocationalInstanceTypes - Tests regional instance type filtering  
+# - ValidateStableInstanceTypeIDs - Tests instance type ID stability
 ```
 
 ### 5. Specific Feature Testing
