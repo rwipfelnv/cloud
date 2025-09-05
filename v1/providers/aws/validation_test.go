@@ -17,7 +17,11 @@ func TestValidationFunctions(t *testing.T) {
 	config := validation.ProviderConfig{
 		Credential: NewAWSCredential("validation-test", "", "", // Empty credentials use default chain
 			WithDefaultRegion(region)),
-		StableIDs: []v1.InstanceTypeID{}, // AWS doesn't have predefined stable IDs
+		StableIDs: []v1.InstanceTypeID{
+			v1.InstanceTypeID(region + "-default-t3.micro"),
+			v1.InstanceTypeID(region + "-default-t3.small"), 
+			v1.InstanceTypeID(region + "-default-t3.medium"),
+		}, // Some common stable instance types
 	}
 
 	validation.RunValidationSuite(t, config)

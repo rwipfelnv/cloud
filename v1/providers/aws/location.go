@@ -3,48 +3,21 @@ package v1
 import (
 	"context"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/ec2"
-
 	v1 "github.com/brevdev/cloud/v1"
 )
 
-// GetLocations retrieves available AWS regions
+// GetLocations returns the current AWS region as a locational API
 func (c *AWSClient) GetLocations(ctx context.Context, args v1.GetLocationsArgs) ([]v1.Location, error) {
-	input := &ec2.DescribeRegionsInput{
-		AllRegions: aws.Bool(args.IncludeUnavailable),
+	// For AWS as a locational API, we only return the current region
+	location := v1.Location{
+		Name:        c.region,
+		Description: c.region,
+		Available:   true,
+		Priority:    1,
+		Country:     determineCountry(c.region),
 	}
 
-	result, err := c.ec2Client.DescribeRegions(ctx, input)
-	if err != nil {
-		return nil, err
-	}
-
-	var locations []v1.Location
-	for i, region := range result.Regions {
-		location := v1.Location{
-			Name:        aws.ToString(region.RegionName),
-			Description: aws.ToString(region.RegionName),
-			Available:   true, // AWS API only returns available regions by default
-			Endpoint:    aws.ToString(region.Endpoint),
-			Priority:    i + 1, // Simple priority based on order
-			Country:     determineCountry(aws.ToString(region.RegionName)),
-		}
-
-		// Mark as unavailable if the region is not opted-in
-		if region.OptInStatus != nil {
-			switch *region.OptInStatus {
-			case "opt-in-not-required", "opted-in":
-				location.Available = true
-			case "not-opted-in":
-				location.Available = args.IncludeUnavailable
-			}
-		}
-
-		locations = append(locations, location)
-	}
-
-	return locations, nil
+	return []v1.Location{location}, nil
 }
 
 // determineCountry maps AWS regions to ISO 3166-1 alpha-3 country codes
