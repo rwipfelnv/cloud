@@ -93,6 +93,10 @@ func (c *AWSClient) CreateInstance(ctx context.Context, attrs v1.CreateInstanceA
 		Key:   aws.String("Name"),
 		Value: aws.String(attrs.Name),
 	})
+	tags = append(tags, types.Tag{
+		Key:   aws.String("CreatedBy"),
+		Value: aws.String("brev-cloud-sdk"),
+	})
 	if attrs.RefID != "" {
 		tags = append(tags, types.Tag{
 			Key:   aws.String("RefID"),
@@ -238,6 +242,14 @@ func (c *AWSClient) ListInstances(ctx context.Context, args v1.ListInstancesArgs
 		Name:   aws.String("instance-state-name"),
 		Values: []string{"pending", "running", "stopping", "stopped", "shutting-down"},
 	})
+
+	// Only return instances created by Brev (unless specific instance IDs are requested)
+	if len(args.InstanceIDs) == 0 {
+		filters = append(filters, types.Filter{
+			Name:   aws.String("tag:CreatedBy"),
+			Values: []string{"brev-cloud-sdk"},
+		})
+	}
 
 	if len(filters) > 0 {
 		input.Filters = filters
