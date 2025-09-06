@@ -211,11 +211,17 @@ fi
 echo ""
 echo "🚀 Step 6: Joining EKS cluster..."
 
-# Use EKS bootstrap script (available on EKS-optimized AMIs)
-JOIN_COMMAND="sudo /etc/eks/bootstrap.sh $EKS_CLUSTER_NAME --b64-cluster-ca '$EKS_CA_DATA' --apiserver-endpoint '$EKS_ENDPOINT'"
+# Get instance availability zone for provider ID
+AVAILABILITY_ZONE=$(aws ec2 describe-instances --region "$AWS_REGION" --instance-ids "$INSTANCE_ID" --query "Reservations[0].Instances[0].Placement.AvailabilityZone" --output text)
+PROVIDER_ID="aws:///$AVAILABILITY_ZONE/$INSTANCE_ID"
+
+echo "   Setting provider ID: $PROVIDER_ID"
+
+# Use EKS bootstrap script with proper kubelet args for cloud provider integration
+JOIN_COMMAND="sudo /etc/eks/bootstrap.sh $EKS_CLUSTER_NAME --b64-cluster-ca '$EKS_CA_DATA' --apiserver-endpoint '$EKS_ENDPOINT' --kubelet-extra-args '--provider-id=$PROVIDER_ID'"
 
 echo "   Running bootstrap command..."
-ssh -i "$SSH_KEY_PATH" -o StrictHostKeyChecking=no ec2-user@"$PUBLIC_IP" "$JOIN_COMMAND"
+ssh -i "$SSH_KEY_PATH" -o StrictHostKeyChecking=no ubuntu@"$PUBLIC_IP" "$JOIN_COMMAND"
 
 echo "   ✅ Bootstrap completed!"
 

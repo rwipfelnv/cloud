@@ -111,7 +111,7 @@ func createInstance(ctx context.Context, client v1.CloudClient, region, instance
 		InstanceType: selectedType.Type,
 		Location:     selectedType.Location,
 		PublicKey:    publicKey,
-		ImageID:      "ami-0eb4348a120bdcf1e", // EKS-optimized AMI for x86_64 (amazon-eks-node-1.32)
+		ImageID:      "ami-01129b2442823dce4", // Ubuntu 22.04 EKS-optimized AMI for x86_64 (ubuntu-eks-node-1.32)
 		VPCID:        "vpc-0f4abb62c03df0c8b",   // EKS cluster VPC
 		SubnetID:     "subnet-03e80a1f6e5d07717", // EKS cluster subnet (first one)
 		DiskSize:     20 * 1024 * 1024 * 1024, // 20 GB in bytes
