@@ -117,9 +117,54 @@ EOF
     sleep 30
 fi
 
-# Step 4: Update aws-auth ConfigMap to allow our role
+# Step 4: Fix security group for EKS connectivity  
 echo ""
-echo "🔧 Step 4: Configuring EKS cluster access..."
+echo "🔧 Step 4: Configuring security groups for EKS connectivity..."
+
+# Get the EKS cluster security group
+EKS_CLUSTER_SG=$(aws eks describe-cluster --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" --query "cluster.resourcesVpcConfig.clusterSecurityGroupId" --output text)
+
+if [ "$EKS_CLUSTER_SG" = "None" ] || [ -z "$EKS_CLUSTER_SG" ]; then
+    # Fallback: find cluster SG by tags
+    EKS_CLUSTER_SG=$(aws ec2 describe-security-groups --region "$AWS_REGION" --filters "Name=tag:aws:eks:cluster-name,Values=$EKS_CLUSTER_NAME" --query "SecurityGroups[0].GroupId" --output text)
+fi
+
+if [ "$EKS_CLUSTER_SG" = "None" ] || [ -z "$EKS_CLUSTER_SG" ]; then
+    echo "   ❌ Could not find EKS cluster security group"
+    exit 1
+fi
+
+echo "   Found EKS cluster security group: $EKS_CLUSTER_SG"
+
+# Get current instance security groups
+CURRENT_SGS=$(aws ec2 describe-instances --region "$AWS_REGION" --instance-ids "$INSTANCE_ID" --query "Reservations[0].Instances[0].SecurityGroups[].GroupId" --output text)
+echo "   Current security groups: $CURRENT_SGS"
+
+# Check if instance already has the EKS cluster security group
+if echo "$CURRENT_SGS" | grep -q "$EKS_CLUSTER_SG"; then
+    echo "   ✅ Instance already has EKS cluster security group"
+else
+    echo "   Adding EKS cluster security group to instance..."
+    
+    # Add the EKS cluster security group to the instance
+    ALL_SGS="$CURRENT_SGS $EKS_CLUSTER_SG"
+    
+    # Modify instance security groups
+    aws ec2 modify-instance-attribute --region "$AWS_REGION" --instance-id "$INSTANCE_ID" --groups $ALL_SGS
+    
+    if [ $? -eq 0 ]; then
+        echo "   ✅ Added EKS cluster security group to instance"
+        echo "   Waiting for security group changes to take effect..."
+        sleep 10
+    else
+        echo "   ❌ Failed to modify instance security groups"
+        exit 1
+    fi
+fi
+
+# Step 5: Update aws-auth ConfigMap to allow our role
+echo ""
+echo "🔧 Step 5: Configuring EKS cluster access..."
 
 ROLE_ARN="arn:aws:iam::$(aws sts get-caller-identity --query Account --output text):role/$ROLE_NAME"
 echo "   Checking if role is authorized: $ROLE_ARN"
@@ -162,9 +207,9 @@ else
     fi
 fi
 
-# Step 5: Join cluster via SSH
+# Step 6: Join cluster via SSH
 echo ""
-echo "🚀 Step 5: Joining EKS cluster..."
+echo "🚀 Step 6: Joining EKS cluster..."
 
 # Use EKS bootstrap script (available on EKS-optimized AMIs)
 JOIN_COMMAND="sudo /etc/eks/bootstrap.sh $EKS_CLUSTER_NAME --b64-cluster-ca '$EKS_CA_DATA' --apiserver-endpoint '$EKS_ENDPOINT'"
@@ -174,9 +219,9 @@ ssh -i "$SSH_KEY_PATH" -o StrictHostKeyChecking=no ec2-user@"$PUBLIC_IP" "$JOIN_
 
 echo "   ✅ Bootstrap completed!"
 
-# Step 6: Verify
+# Step 7: Verify
 echo ""
-echo "🔍 Step 6: Verifying node joined..."
+echo "🔍 Step 7: Verifying node joined..."
 sleep 30
 
 NODE_NAME="ip-$(echo $PRIVATE_IP | tr '.' '-').$AWS_REGION.compute.internal"
