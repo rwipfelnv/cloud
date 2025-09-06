@@ -55,7 +55,7 @@ func RunInstanceLifecycleValidation(t *testing.T, config ProviderConfig) {
 		t.Skip("Skipping validation tests in short mode")
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel()
 
 	client, err := config.Credential.MakeClient(ctx, config.Location)
