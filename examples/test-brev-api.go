@@ -105,12 +105,15 @@ func createInstance(ctx context.Context, client v1.CloudClient, region, instance
 		fmt.Printf("   ✅ Generated new SSH key at %s\n", keyPath)
 	}
 
-	// Create instance
+	// Create instance with EKS-optimized AMI in the EKS cluster VPC
 	attrs := v1.CreateInstanceAttrs{
 		Name:         name,
 		InstanceType: selectedType.Type,
 		Location:     selectedType.Location,
 		PublicKey:    publicKey,
+		ImageID:      "ami-0eb4348a120bdcf1e", // EKS-optimized AMI for x86_64 (amazon-eks-node-1.32)
+		VPCID:        "vpc-0f4abb62c03df0c8b",   // EKS cluster VPC
+		SubnetID:     "subnet-03e80a1f6e5d07717", // EKS cluster subnet (first one)
 		DiskSize:     20 * 1024 * 1024 * 1024, // 20 GB in bytes
 	}
 
@@ -132,12 +135,6 @@ func createInstance(ctx context.Context, client v1.CloudClient, region, instance
 	fmt.Printf("   Private IP: %s\n", instance.PrivateIP)
 	fmt.Printf("   SSH User: %s\n", instance.SSHUser)
 	fmt.Printf("   SSH Port: %d\n", instance.SSHPort)
-
-	fmt.Println("\n🔧 To destroy this instance, run:")
-	fmt.Printf("   go run test-brev-api.go -action=destroy -instance-id=%s\n", instance.CloudID)
-
-	fmt.Println("\n📝 To SSH to this instance (once ready):")
-	fmt.Printf("   ssh -i ~/.ssh/your-key %s@%s\n", instance.SSHUser, instance.PublicIP)
 }
 
 func destroyInstance(ctx context.Context, client v1.CloudClient, instanceID string) {
