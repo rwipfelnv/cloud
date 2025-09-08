@@ -34,18 +34,24 @@ EKS_CA_DATA=$(aws eks describe-cluster --region "$AWS_REGION" --name "$EKS_CLUST
 
 echo "   ✅ Cluster endpoint: $EKS_ENDPOINT"
 
-# Step 2: Get instance IP
+# Step 2: Update kubeconfig for the target cluster
 echo ""
-echo "🔍 Step 2: Getting instance information..."
+echo "🔧 Step 2: Updating kubeconfig for cluster access..."
+aws eks update-kubeconfig --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME"
+echo "   ✅ Kubeconfig updated for cluster: $EKS_CLUSTER_NAME"
+
+# Step 3: Get instance IP
+echo ""
+echo "🔍 Step 3: Getting instance information..."
 PUBLIC_IP=$(aws ec2 describe-instances --region "$AWS_REGION" --instance-ids "$INSTANCE_ID" --query "Reservations[0].Instances[0].PublicIpAddress" --output text)
 PRIVATE_IP=$(aws ec2 describe-instances --region "$AWS_REGION" --instance-ids "$INSTANCE_ID" --query "Reservations[0].Instances[0].PrivateIpAddress" --output text)
 
 echo "   ✅ Public IP: $PUBLIC_IP"
 echo "   ✅ Private IP: $PRIVATE_IP"
 
-# Step 3: Setup IAM instance profile for EKS
+# Step 4: Setup IAM instance profile for EKS
 echo ""
-echo "🔐 Step 3: Setting up IAM permissions for EKS..."
+echo "🔐 Step 4: Setting up IAM permissions for EKS..."
 
 ROLE_NAME="BrevEKSNodeRole-${EKS_CLUSTER_NAME}"
 INSTANCE_PROFILE_NAME="BrevEKSNodeProfile-${EKS_CLUSTER_NAME}"
@@ -124,9 +130,9 @@ EOF
     sleep 30
 fi
 
-# Step 4: Fix security group for EKS connectivity  
+# Step 5: Fix security group for EKS connectivity  
 echo ""
-echo "🔧 Step 4: Configuring security groups for EKS connectivity..."
+echo "🔧 Step 5: Configuring security groups for EKS connectivity..."
 
 # Get the EKS cluster security group
 EKS_CLUSTER_SG=$(aws eks describe-cluster --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" --query "cluster.resourcesVpcConfig.clusterSecurityGroupId" --output text)
@@ -169,9 +175,9 @@ else
     fi
 fi
 
-# Step 5: Update aws-auth ConfigMap to allow our role
+# Step 6: Update aws-auth ConfigMap to allow our role
 echo ""
-echo "🔧 Step 5: Configuring EKS cluster access..."
+echo "🔧 Step 6: Configuring EKS cluster access..."
 
 ROLE_ARN="arn:aws:iam::$(aws sts get-caller-identity --query Account --output text):role/$ROLE_NAME"
 echo "   Checking if role is authorized: $ROLE_ARN"
@@ -189,16 +195,26 @@ if kubectl get configmap aws-auth -n kube-system -o yaml | grep -q "$ROLE_ARN"; 
 else
     echo "   Adding role to aws-auth ConfigMap..."
     
-    # Get current mapRoles and append our role
+    # Get current mapRoles
     CURRENT_MAP_ROLES=$(kubectl get configmap aws-auth -n kube-system -o jsonpath='{.data.mapRoles}')
     
-    # Create new mapRoles with our role appended (ensure proper formatting)
-    NEW_MAP_ROLES="${CURRENT_MAP_ROLES}
-    - groups:
-      - system:bootstrappers
-      - system:nodes
-      rolearn: ${ROLE_ARN}
-      username: system:node:{{EC2PrivateDNSName}}"
+    # Check if it's empty or just "[]"
+    if [ "$CURRENT_MAP_ROLES" = "[]" ] || [ -z "$CURRENT_MAP_ROLES" ]; then
+        # Create new mapRoles with just our role
+        NEW_MAP_ROLES="- groups:
+  - system:bootstrappers
+  - system:nodes
+  rolearn: ${ROLE_ARN}
+  username: system:node:{{EC2PrivateDNSName}}"
+    else
+        # Append to existing mapRoles with proper YAML formatting
+        NEW_MAP_ROLES="${CURRENT_MAP_ROLES}
+- groups:
+  - system:bootstrappers
+  - system:nodes
+  rolearn: ${ROLE_ARN}
+  username: system:node:{{EC2PrivateDNSName}}"
+    fi
     
     # Update the ConfigMap using kubectl create with --dry-run and apply
     kubectl create configmap aws-auth --from-literal=mapRoles="$NEW_MAP_ROLES" --from-literal=mapUsers="[]" -n kube-system --dry-run=client -o yaml | kubectl apply -f -
@@ -221,9 +237,9 @@ else
     fi
 fi
 
-# Step 6: Join cluster via SSH
+# Step 7: Join cluster via SSH
 echo ""
-echo "🚀 Step 6: Joining EKS cluster..."
+echo "🚀 Step 7: Joining EKS cluster..."
 
 # Get instance availability zone for provider ID
 AVAILABILITY_ZONE=$(aws ec2 describe-instances --region "$AWS_REGION" --instance-ids "$INSTANCE_ID" --query "Reservations[0].Instances[0].Placement.AvailabilityZone" --output text)
@@ -239,17 +255,15 @@ ssh -i "$SSH_KEY_PATH" -o StrictHostKeyChecking=no ubuntu@"$PUBLIC_IP" "$JOIN_CO
 
 echo "   ✅ Bootstrap completed!"
 
-# Step 7: Verify
+# Step 8: Verify
 echo ""
-echo "🔍 Step 7: Verifying node joined..."
+echo "🔍 Step 8: Verifying node joined..."
 sleep 30
 
 NODE_NAME="ip-$(echo $PRIVATE_IP | tr '.' '-').$AWS_REGION.compute.internal"
 echo "   Expected node name: $NODE_NAME"
 
 # Check if node appears in cluster
-# Update kubeconfig for the target cluster and check nodes
-aws eks update-kubeconfig --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME"
 if kubectl get nodes | grep -q "$NODE_NAME"; then
     echo "   ✅ Node successfully joined cluster!"
     kubectl get nodes | grep "$NODE_NAME"
