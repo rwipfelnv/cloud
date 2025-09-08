@@ -95,18 +95,25 @@ EOF
         echo "   ✅ IAM role already exists: $ROLE_NAME"
     fi
     
-    # Create instance profile
+    # Create instance profile if it doesn't exist
     if ! aws iam get-instance-profile --instance-profile-name "$INSTANCE_PROFILE_NAME" > /dev/null 2>&1; then
         echo "   Creating instance profile: $INSTANCE_PROFILE_NAME"
         aws iam create-instance-profile --instance-profile-name "$INSTANCE_PROFILE_NAME"
-        aws iam add-role-to-instance-profile --instance-profile-name "$INSTANCE_PROFILE_NAME" --role-name "$ROLE_NAME"
         
         # Wait for instance profile propagation
         echo "   Waiting for instance profile propagation..."
-        sleep 20
+        sleep 10
     else
         echo "   ✅ Instance profile already exists: $INSTANCE_PROFILE_NAME"
     fi
+
+    # Always ensure role is attached to instance profile (idempotent operation)
+    echo "   Ensuring role is attached to instance profile..."
+    aws iam add-role-to-instance-profile --instance-profile-name "$INSTANCE_PROFILE_NAME" --role-name "$ROLE_NAME" 2>/dev/null || true
+
+    # Wait for role attachment propagation  
+    echo "   Waiting for role attachment propagation..."
+    sleep 20
     
     # Attach instance profile to EC2 instance
     echo "   Attaching instance profile to instance..."
@@ -168,6 +175,13 @@ echo "🔧 Step 5: Configuring EKS cluster access..."
 
 ROLE_ARN="arn:aws:iam::$(aws sts get-caller-identity --query Account --output text):role/$ROLE_NAME"
 echo "   Checking if role is authorized: $ROLE_ARN"
+
+# Check if aws-auth ConfigMap exists, create if missing
+if ! kubectl get configmap aws-auth -n kube-system > /dev/null 2>&1; then
+    echo "   Creating aws-auth ConfigMap..."
+    kubectl create configmap aws-auth -n kube-system --from-literal=mapRoles="[]" --from-literal=mapUsers="[]"
+    echo "   ✅ Created empty aws-auth ConfigMap"
+fi
 
 # Check if our role is already in aws-auth ConfigMap
 if kubectl get configmap aws-auth -n kube-system -o yaml | grep -q "$ROLE_ARN"; then
@@ -234,12 +248,14 @@ NODE_NAME="ip-$(echo $PRIVATE_IP | tr '.' '-').$AWS_REGION.compute.internal"
 echo "   Expected node name: $NODE_NAME"
 
 # Check if node appears in cluster
-if aws eks update-kubeconfig --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" --dry-run > /tmp/kubeconfig 2>/dev/null; then
-    if kubectl --kubeconfig /tmp/kubeconfig get nodes | grep -q "$NODE_NAME"; then
-        echo "   ✅ Node successfully joined cluster!"
-    else
-        echo "   ⚠️  Node still joining... check: kubectl get nodes"
-    fi
+# Update kubeconfig for the target cluster and check nodes
+aws eks update-kubeconfig --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME"
+if kubectl get nodes | grep -q "$NODE_NAME"; then
+    echo "   ✅ Node successfully joined cluster!"
+    kubectl get nodes | grep "$NODE_NAME"
+else
+    echo "   ⚠️  Node still joining... Current nodes:"
+    kubectl get nodes --no-headers | awk '{print "     - " $1 " (" $2 ")"}'
 fi
 
 echo ""

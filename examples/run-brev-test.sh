@@ -28,21 +28,27 @@ if [ $# -eq 0 ]; then
     echo ""
     echo "Usage examples:"
     echo ""
-    echo "📋 List instances:"
-    echo "   $0 list"
+    echo "📋 List resources:"
+    echo "   $0 list --resource instance    # List EC2 instances"
+    echo "   $0 list --resource cluster     # List EKS clusters"
     echo ""
-    echo "🚀 Create instance:"
-    echo "   $0 create"
-    echo "   $0 create --type t3.small --name my-test-instance"
+    echo "🚀 Create resources:"
+    echo "   $0 create --resource instance  # Create EC2 instance"
+    echo "   $0 create --resource cluster   # Create EKS cluster"
+    echo "   $0 create --resource cluster --name my-test-cluster --version 1.31"
     echo ""
-    echo "💥 Destroy instance:"
-    echo "   $0 destroy --instance-id i-1234567890abcdef0"
+    echo "💥 Destroy resources:"
+    echo "   $0 destroy --resource instance --instance-id i-1234567890abcdef0"
+    echo "   $0 destroy --resource cluster --cluster-name my-test-cluster"
     echo ""
     echo "Available options:"
+    echo "   --resource    Resource type: instance or cluster (default: instance)"
     echo "   --type        Instance type (default: t3.micro)"
     echo "   --region      AWS region (default: us-west-2)"
-    echo "   --name        Instance name (default: brev-test-instance)"
+    echo "   --name        Resource name (default: brev-test-instance)"
+    echo "   --version     Kubernetes version for cluster (default: 1.32)"
     echo "   --instance-id Instance ID for destroy action"
+    echo "   --cluster-name  Cluster name for destroy action"
     exit 0
 fi
 
@@ -52,15 +58,15 @@ shift
 
 case "$ACTION" in
     "create")
-        echo "🚀 Creating instance using Brev API..."
+        echo "🚀 Creating resource using Brev API..."
         go run test-brev-api.go -action=create "$@"
         ;;
     "destroy")
-        echo "💥 Destroying instance using Brev API..."
+        echo "💥 Destroying resource using Brev API..."
         go run test-brev-api.go -action=destroy "$@"
         ;;
     "list")
-        echo "📋 Listing instances using Brev API..."
+        echo "📋 Listing resources using Brev API..."
         go run test-brev-api.go -action=list "$@"
         ;;
     *)
