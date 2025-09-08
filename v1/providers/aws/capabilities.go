@@ -34,6 +34,13 @@ func getAWSCapabilities() v1.Capabilities {
 
 		// User Data Support
 		v1.CapabilityInstanceUserData, // EC2 RunInstances UserData parameter
+
+		// Kubernetes Cluster Management
+		v1.CapabilityCreateCluster,    // EKS CreateCluster
+		v1.CapabilityListClusters,     // EKS ListClusters/DescribeCluster  
+		v1.CapabilityGetCluster,       // EKS DescribeCluster
+		v1.CapabilityDeleteCluster,    // EKS DeleteCluster
+		v1.CapabilityClusterManagement, // Combined cluster management capability
 	}
 }
 

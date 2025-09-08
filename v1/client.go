@@ -41,5 +41,6 @@ type CloudClient interface {
 	CloudChangeInstanceType
 	CloudModifyFirewall
 	CloudInstanceTags
+	CloudClusterManager
 	UpdateHandler
 }

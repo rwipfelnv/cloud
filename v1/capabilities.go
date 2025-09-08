@@ -35,3 +35,11 @@ const CapabilityStopStartInstance Capability = "stop-start-instance"
 const CapabilityMachineImage Capability = "machine-image"
 
 const CapabilityModifyFirewall Capability = "modify-firewall"
+
+const (
+	CapabilityCreateCluster    Capability = "create-cluster"
+	CapabilityListClusters     Capability = "list-clusters"
+	CapabilityGetCluster       Capability = "get-cluster"
+	CapabilityDeleteCluster    Capability = "delete-cluster"
+	CapabilityClusterManagement Capability = "cluster-management"
+)

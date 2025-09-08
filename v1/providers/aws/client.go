@@ -10,6 +10,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	"github.com/aws/aws-sdk-go-v2/service/eks"
+	"github.com/aws/aws-sdk-go-v2/service/iam"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/cenkalti/backoff/v4"
 
@@ -109,6 +111,8 @@ type AWSClient struct {
 	region     string
 	awsConfig  aws.Config
 	ec2Client  *ec2.Client
+	eksClient  *eks.Client
+	iamClient  *iam.Client
 	ssmClient  *ssm.Client
 	credential *AWSCredential
 	backoff    backoff.BackOff
@@ -199,6 +203,8 @@ func NewAWSClient(refID string, credential *AWSCredential, region string, opts .
 		region:     region,
 		awsConfig:  cfg,
 		ec2Client:  ec2.NewFromConfig(cfg),
+		eksClient:  eks.NewFromConfig(cfg),
+		iamClient:  iam.NewFromConfig(cfg),
 		ssmClient:  ssm.NewFromConfig(cfg),
 		credential: credential,
 		backoff:    options.backoff,

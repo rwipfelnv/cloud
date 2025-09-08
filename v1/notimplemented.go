@@ -126,3 +126,23 @@ func (c notImplCloudClient) MergeInstanceTypeForUpdate(_, i InstanceType) Instan
 func (c notImplCloudClient) GetMaxCreateRequestsPerMinute() int {
 	return 10
 }
+
+func (c notImplCloudClient) CreateCluster(_ context.Context, _ CreateClusterAttrs) (*Cluster, error) {
+	return nil, ErrNotImplemented
+}
+
+func (c notImplCloudClient) GetCluster(_ context.Context, _ CloudProviderClusterID) (*Cluster, error) {
+	return nil, ErrNotImplemented
+}
+
+func (c notImplCloudClient) ListClusters(_ context.Context, _ ListClustersArgs) ([]Cluster, error) {
+	return nil, ErrNotImplemented
+}
+
+func (c notImplCloudClient) DeleteCluster(_ context.Context, _ CloudProviderClusterID) error {
+	return ErrNotImplemented
+}
+
+func (c notImplCloudClient) GetMaxCreateClusterRequestsPerMinute() int {
+	return 2 // Conservative default for cluster creation
+}
